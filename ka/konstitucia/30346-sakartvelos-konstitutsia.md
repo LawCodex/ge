@@ -3,7 +3,7 @@ title: "საქართველოს კონსტიტუცია"
 identifier: "786"
 matsne_id: 30346
 registration_code: "010.010.000.01.001.000.116"
-type: act
+type: constitution
 document_type: "საქართველოს რესპუბლიკის კონსტიტუციური კანონი"
 issuer: "საქართველოს რესპუბლიკის პარლამენტი"
 jurisdiction: ge

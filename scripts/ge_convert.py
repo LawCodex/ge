@@ -115,6 +115,36 @@ def is_bold(el):
     return len(b) >= 0.9 * len(t)
 
 
+def unwrap_new_format(maindoc, soup):
+    """Newer matsne documents lay out every structural unit as tables with ids like
+    'DOCUMENT:1;PART:1;CHAPTER:2;ARTICLE:5;_Title' / '..._Content'. Turn titles into
+    structural paragraphs and unwrap the content/container tables."""
+    for tb in list(maindoc.find_all("table", id=re.compile(r"^DOCUMENT:"))):
+        tid = tb.get("id", "")
+        if tid.endswith("_Title"):
+            for blk in tb.find_all(["div", "center", "p"]):
+                blk.insert_after(NavigableString("\n"))
+            txt = ". ".join(x for x in text_of(tb).split("\n") if x.strip())
+            txt = re.sub(r"\.\s*\.", ".", txt)
+            p = soup.new_tag("p")
+            a = soup.new_tag("a", attrs={"class": "oldStyleDocumentPart"})
+            a.string = txt
+            p.append(a)
+            tb.replace_with(p)
+        else:
+            for td in tb.find_all("td"):
+                if td.find_parent("table") is tb:
+                    div = soup.new_tag("div")
+                    for c in list(td.contents):
+                        div.append(c.extract())
+                    td.replace_with(div)
+            for tag in tb.find_all(["tr", "tbody"]):
+                if tag.find_parent("table") is tb:
+                    tag.unwrap()
+            tb.name = "div"
+            tb.attrs = {}
+
+
 def convert_body(maindoc, lang, title):
     items = []  # (kind or None, text) ; kind 'table', 'note', 'para', or heading kind
     for el in blocks(maindoc):
@@ -202,7 +232,7 @@ def dmy(s):
 
 def category(item):
     t, typ = item["title"], item["meta"][0] if item["meta"] else ""
-    if "კონსტიტუცია" in typ and "ავტონომიური" not in typ:
+    if ("კონსტიტუცია" in typ and "ავტონომიური" not in typ) or re.match(r"საქართველოს კონსტიტუცია\s*$", t):
         return "konstitucia", "constitution"
     if "ავტონომიური" in typ:
         return "avtonomiuri-respublikebi", "act"
@@ -237,6 +267,7 @@ def main():
                 continue
             for x in md.find_all(["style", "script"]):
                 x.decompose()
+            unwrap_new_format(md, soup)
             meta = meta_table(soup)
             name = soup.select_one('#maindoc a[name="DOCUMENT"]')
             title = it["title"] if lang == "ka" else (name.get_text(" ", strip=True) if name else it["title"])
